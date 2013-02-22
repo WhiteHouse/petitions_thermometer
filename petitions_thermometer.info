@@ -1,0 +1,4 @@
+name = petitions_thermometer
+description = "Add a petitions thermometer block to your Drupal website"
+; Core version (required)
+core = 7.x

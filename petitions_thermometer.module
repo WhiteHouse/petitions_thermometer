@@ -1,0 +1,135 @@
+<?php
+/**
+ * @file
+ * This is the file description for the Petitions thermometer module.
+ *
+ * The petitions thermometer lets you add a block to your Drupal
+ * website that displays information about a single petition on the
+ * White House "We the People" petition website.
+ */
+
+/**
+ * Implements hook_menu().
+ */
+function petitions_thermometer_menu() {
+  $items['petitions/autocomplete/%'] = array(
+    'page callback' => 'petitions_thermometer_autocomplete',
+    'page arguments' => array(2),
+    'access arguments' => array('access content'),
+    'type' => MENU_CALLBACK,
+  );
+  return $items;
+}
+
+/**
+ * Implements hook_block_configure().
+ */
+function petitions_thermometer_block_configure($delta = '') {
+  $form = array();
+  if ($delta == 'thermometer') {
+    $form['thermometer_petition_id'] = array(
+      '#type' => 'textfield',
+      '#title' => t('Petition ID'),
+      '#default_value' => variable_get('thermometer_petition_id', '50cb6d2ba9a0b1c52e000017'),
+      '#size' => 60,
+      '#autocomplete_path' => 'petitions/autocomplete',
+      '#description' => t("Enter the name of the petition you want to list."),
+    );
+  }
+  return $form;
+}
+
+/**
+ * Returns the list of petitions as an associative array.
+ *
+ * @return Array
+ *   An associative array with four elements:
+ *     'datatypes' => array of the basic datatypes, e.g., Number, Text, Boolean
+ *     'properties' => array of the schema equivalent of Drupal fields
+ *     'types' => array of the equivalent of Drupal "entity subtypes" (bundles)
+ *     'valid' => a string with the date when the schema was last updated
+ */
+function petitions_thermometer_cache_all() {
+  if ($cache = cache_get("petitions_thermometer:petitions")) {
+    $petitions = $cache->data;
+  }
+  else {
+    $result = drupal_http_request("https://petitions.whitehouse.gov/api/v1/petitions.jsonp?&key=aVmupNPJmgkweR9&limit=1000");
+    $results = drupal_json_decode($result->data);
+    $petitions = array();
+    foreach ($results['results'] as $petition) {
+      $petitions[$petition['id']] = $petition['title'];
+    }
+    cache_set("petitions_thermometer:petitions", $petitions);
+  }
+  return $petitions;
+}
+
+/**
+ * Returns JSON for the autocomplete AJAX.
+ *
+ * @param String $string
+ *   A text string to use when searching the list of petitions.
+ */
+function petitions_thermometer_autocomplete($string) {
+  $matches = array();
+  if ($string) {
+    foreach (petitions_thermometer_cache_all() as $key => $title) {
+      if (strpos($title, $string)) {
+        $matches[$title . " [pid:$key]"] = check_plain($title);
+      }
+    }
+  }
+  drupal_json_output($matches);
+}
+
+/**
+ * Implements hook_block_save().
+ */
+function petitions_thermometer_block_save($delta = '', $edit = array()) {
+  if ($delta == 'thermometer') {
+    variable_set('thermometer_petition_id', $edit['thermometer_petition_id']);
+  }
+}
+
+/**
+ * Implements hook_block_info().
+ */
+function petitions_thermometer_block_info() {
+  $blocks['thermometer'] = array(
+    'info' => t('Thermometer'),
+    'cache' => DRUPAL_NO_CACHE,
+  );
+  return $blocks;
+}
+
+/**
+ * Implements hook_block_view().
+ */
+function petitions_thermometer_block_view($delta = '') {
+  $block = array();
+  switch ($delta) {
+    case 'thermometer':
+      $block['subject'] = t('Thermometer');
+      $petition_id_string = variable_get('thermometer_petition_id', '50cb6d2ba9a0b1c52e000017');
+      preg_match('/(.*\[pid:)?([^]]*)\]?/', $petition_id_string, $matches);
+      $petition_id = $matches[2];
+      $block['content'] = theme('petitions_thermometer', array('petition_id' => $petition_id));
+      break;
+  }
+  return $block;
+}
+
+/**
+ * Implements hook_theme().
+ */
+function petitions_thermometer_theme($existing, $type, $theme, $path) {
+  return array(
+    'petitions_thermometer' => array(
+      'variables' => array(
+        'petition_id' => NULL,
+      ),
+      'template' => 'petitions_thermometer',
+    ),
+  );
+}
