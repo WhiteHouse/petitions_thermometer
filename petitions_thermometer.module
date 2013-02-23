@@ -12,9 +12,8 @@
  * Implements hook_menu().
  */
 function petitions_thermometer_menu() {
-  $items['petitions/autocomplete/%'] = array(
+  $items['petitions/autocomplete'] = array(
     'page callback' => 'petitions_thermometer_autocomplete',
-    'page arguments' => array(2),
     'access arguments' => array('access content'),
     'type' => MENU_CALLBACK,
   );
@@ -31,9 +30,10 @@ function petitions_thermometer_block_configure($delta = '') {
       '#type' => 'textfield',
       '#title' => t('Petition ID'),
       '#default_value' => variable_get('thermometer_petition_id', '50cb6d2ba9a0b1c52e000017'),
-      '#size' => 60,
+      '#size' => '120',
       '#autocomplete_path' => 'petitions/autocomplete',
       '#description' => t("Enter the name of the petition you want to list."),
+      '#maxlength' => '255',
     );
   }
   return $form;
@@ -71,12 +71,12 @@ function petitions_thermometer_cache_all() {
  * @param String $string
  *   A text string to use when searching the list of petitions.
  */
-function petitions_thermometer_autocomplete($string) {
+function petitions_thermometer_autocomplete($string='') {
   $matches = array();
   if ($string) {
     foreach (petitions_thermometer_cache_all() as $key => $title) {
       if (strpos($title, $string)) {
-        $matches[$title . " [pid:$key]"] = check_plain($title);
+        $matches[truncate_utf8($title, 80, TRUE, TRUE) . " [pid:$key]"] = check_plain($title);
       }
     }
   }
